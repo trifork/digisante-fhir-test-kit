@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  test:
+    name: Build + integration tests (CH EMR IG)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install podman + podman-compose
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y podman python3-pip curl
+          sudo pip3 install podman-compose
+
+      - name: Provision stack (loads the CH EMR IG)
+        run: COMPOSE=podman-compose ./tests/provision.sh
+
+      - name: Run tests
+        run: ./tests/run-tests.sh
+
+      - name: Dump container logs on failure
+        if: failure()
+        run: COMPOSE=podman-compose podman-compose logs --tail=300 || true
