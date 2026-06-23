@@ -23,22 +23,40 @@ echo "  IG_URLS=$IG_URLS"
 # shellcheck disable=SC2086
 $COMPOSE up -d --build
 
-wait_for() {
-  local label=$1 url=$2 tries=$3
-  echo -n "Waiting for $label "
-  for _ in $(seq 1 "$tries"); do
-    if curl -sf "$url" >/dev/null 2>&1; then echo " ready"; return 0; fi
-    echo -n "."
-    sleep 5
+# Container runtime used for diagnostics / fail-fast (podman or docker).
+RT=""
+if command -v podman >/dev/null 2>&1; then RT=podman; elif command -v docker >/dev/null 2>&1; then RT=docker; fi
+
+dump_logs() {
+  [ -n "$RT" ] || return 0
+  echo "----- container status -----"
+  $RT ps -a 2>/dev/null || true
+  for c in $($RT ps -a --format '{{.Names}}' 2>/dev/null | grep -iE 'fhir|db'); do
+    echo "----- logs: $c (tail 200) -----"
+    $RT logs --tail 200 "$c" 2>&1 || true
   done
-  echo " TIMEOUT"
-  return 1
+}
+
+# True if the fhir container has exited/died (boot-time IG install is fatal, so a
+# crash means the server will never come up — fail fast instead of waiting).
+fhir_crashed() {
+  [ -n "$RT" ] || return 1
+  $RT ps -a --format '{{.Names}} {{.Status}}' 2>/dev/null \
+    | grep -i fhir | grep -qiE 'exited|dead'
 }
 
 # The server only starts serving after boot-time IG install completes, and with
 # transitive dependencies that means downloading/installing ~10-15 packages, so
 # allow generous time.
-wait_for "FHIR server" "http://localhost:${FHIR_PORT}/fhir/metadata" 150
+echo -n "Waiting for FHIR server "
+up=0
+for _ in $(seq 1 240); do
+  if curl -sf "http://localhost:${FHIR_PORT}/fhir/metadata" >/dev/null 2>&1; then echo " ready"; up=1; break; fi
+  if fhir_crashed; then echo " CRASHED"; dump_logs; exit 1; fi
+  echo -n "."
+  sleep 5
+done
+if [ "$up" != 1 ]; then echo " TIMEOUT"; dump_logs; exit 1; fi
 
 # The CH EMR IG plus its dependencies take a while to download and install on the
 # first boot; poll until constraint profiles appear.

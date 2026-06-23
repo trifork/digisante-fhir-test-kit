@@ -36,7 +36,15 @@ jobs:
 
       - name: Dump container logs on failure
         if: failure()
-        run: COMPOSE=podman-compose podman-compose logs --tail=300 || true
+        # podman-compose logs passes --color, which podman 3.4.4 rejects; use
+        # podman directly.
+        run: |
+          podman ps -a || true
+          for c in $(podman ps -a --format '{{.Names}}' | grep -iE 'fhir|db'); do
+            echo "::group::logs $c"
+            podman logs --tail 300 "$c" 2>&1 || true
+            echo "::endgroup::"
+          done
 
   publish:
     name: Publish image
