@@ -19,24 +19,29 @@ jobs:
     name: Build + integration tests (CH EMR IG)
     runs-on: ubuntu-22.04
     timeout-minutes: 45
+    env:
+      # Use Docker Compose on the runner: it provides service-name DNS and honours
+      # depends_on healthchecks (the runner's podman-compose/podman 3.4.4 does
+      # neither, so the server cannot reach the "db" host). Docker is preinstalled.
+      COMPOSE: docker compose
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install podman + podman-compose
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y podman python3-pip curl
-          sudo pip3 install podman-compose
-
       - name: Provision stack (loads the CH EMR IG)
-        run: COMPOSE=podman-compose ./tests/provision.sh
+        run: ./tests/provision.sh
 
       - name: Run tests
         run: ./tests/run-tests.sh
 
       - name: Dump container logs on failure
         if: failure()
-        run: COMPOSE=podman-compose podman-compose logs --tail=300 || true
+        run: |
+          docker ps -a || true
+          for c in $(docker ps -a --format '{{.Names}}' | grep -iE 'fhir|db'); do
+            echo "::group::logs $c"
+            docker logs --tail 300 "$c" 2>&1 || true
+            echo "::endgroup::"
+          done
 
   publish:
     name: Publish image
