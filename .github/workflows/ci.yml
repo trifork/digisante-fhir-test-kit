@@ -79,13 +79,17 @@ jobs:
             type=raw,value=hapi-${{ env.HAPI_VERSION }}
             type=sha
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and push FHIR server image
+      - name: Build and push FHIR server image (multi-arch)
         uses: docker/build-push-action@v6
         with:
           context: ./fhir-server
+          platforms: linux/amd64,linux/arm64
           build-args: |
             HAPI_VERSION=${{ env.HAPI_VERSION }}
           push: true
