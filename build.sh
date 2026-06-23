@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Build the DigiSanté FHIR Test Kit images.
+# Build the DigiSanté FHIR Test Kit image from source.
 #
-# The selected HAPI FHIR version is baked into the image NAME, while the kit's
-# own release is carried as a separate image TAG (IMAGE_VERSION). Both are
-# configurable; defaults below (and any values in a local .env) are used when
-# unset.
+# Local builds use a distinct "local" tag scheme (an unqualified image name with
+# the LOCAL_TAG tag, default "local") so they never collide with the published
+# GHCR images (versioned tags like 1.0.0, or latest) and are never pushed.
+# The selected HAPI FHIR version (HAPI_VERSION) is baked into the image.
+#
+# This is equivalent to:
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml build
 
 cd "$(dirname "$0")"
 
@@ -19,10 +22,10 @@ if [ -f .env ]; then
 fi
 
 HAPI_VERSION="${HAPI_VERSION:-v8.4.0-3}"
-IMAGE_VERSION="${IMAGE_VERSION:-0.1.0}"
-IMAGE_PREFIX="${IMAGE_PREFIX:-digisante-fhir-test-kit}"
+LOCAL_IMAGE="${LOCAL_IMAGE:-digisante-fhir-test-kit}"
+LOCAL_TAG="${LOCAL_TAG:-local}"
 
-FHIR_IMAGE="${IMAGE_PREFIX}-hapi-${HAPI_VERSION}:${IMAGE_VERSION}"
+FHIR_IMAGE="${LOCAL_IMAGE}:${LOCAL_TAG}"
 
 echo "Building FHIR server image: ${FHIR_IMAGE} (HAPI ${HAPI_VERSION})"
 docker build \
@@ -32,7 +35,7 @@ docker build \
   fhir-server
 
 echo
-echo "Built:"
-echo "  ${FHIR_IMAGE}"
+echo "Built: ${FHIR_IMAGE}"
 echo
-echo "Run with: HAPI_VERSION=${HAPI_VERSION} IMAGE_VERSION=${IMAGE_VERSION} docker compose up -d"
+echo "Run the locally built image with:"
+echo "  docker compose -f docker-compose.yml -f docker-compose.build.yml up -d"

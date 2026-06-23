@@ -1,0 +1,16 @@
+# Build-from-source override. Use alongside the base compose file to build the
+# FHIR image locally instead of pulling the published one:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+#
+# Locally built images use a distinct "local" tag scheme (LOCAL_TAG, default
+# "local") on an unqualified image name, so they never collide with the published
+# versioned tags (1.0.0, …) or latest, and are never pushed to the registry.
+services:
+  fhir:
+    image: ${LOCAL_IMAGE:-digisante-fhir-test-kit}:${LOCAL_TAG:-local}
+    pull_policy: build
+    build:
+      context: ./fhir-server
+      args:
+        HAPI_VERSION: ${HAPI_VERSION:-v8.4.0-3}

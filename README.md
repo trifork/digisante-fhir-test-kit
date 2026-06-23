@@ -14,32 +14,46 @@ and the tester is branded for HL7 Switzerland.
 | Service | Image | Port | Purpose |
 | --- | --- | --- | --- |
 | `db` | `postgres:16-alpine` | — | Persistence |
-| `fhir` | `…-hapi-<HAPI_VERSION>:<IMAGE_VERSION>` (from `hapiproject/hapi`) | 8080 | FHIR REST API + generic tester |
+| `fhir` | `ghcr.io/trifork/digisante-fhir-test-kit:<tag>` (built `FROM hapiproject/hapi`) | 8080 | FHIR REST API + generic tester |
 
 > **Base-image note:** the FHIR image is built `FROM hapiproject/hapi:<version>`,
 > which is a distroless/Debian image — *not* Alpine. To make it Alpine, switch to a
 > from-source multi-stage build.
 
-## Versioning
+## Images & versioning
 
-The selected HAPI version is baked into the image **name**; the kit's own release is a separate image **tag**:
+The FHIR image is published to the GitHub Container Registry by CI:
 
-```
-digisante-fhir-test-kit-hapi-v8.4.0-3 : 0.1.0
-          └── HAPI version (name) ──┘   └ IMAGE_VERSION (tag)
-```
+- `ghcr.io/trifork/digisante-fhir-test-kit:latest` — rolling, from `main`.
+- `ghcr.io/trifork/digisante-fhir-test-kit:<version>` — immutable, from git tags
+  (`1.0.0`, `1.0`, `1`); plus `hapi-<HAPI_VERSION>` and `sha-<sha>` tags.
 
-Both are configurable via `HAPI_VERSION` and `IMAGE_VERSION` (build args / `.env`).
+By default `docker compose up` **pulls** the published image (`latest`, or pin
+`IMAGE_TAG`). Local builds (see below) use a separate `:local` tag scheme, so they
+never collide with the published versioned tags or `latest`.
 
-## Quick start
+## Quick start (pull the published image)
 
 ```bash
-cp .env.example .env          # then edit IG_URLS, versions, ports
-./build.sh                    # builds the versioned FHIR image
-docker compose up -d          # or: podman compose up -d
+cp .env.example .env          # then edit IG_URLS, IMAGE_TAG, ports
+docker compose up -d          # pulls ghcr.io/trifork/digisante-fhir-test-kit:${IMAGE_TAG:-latest}
 ```
 
 - Generic tester + API: <http://localhost:8080>
+
+Pin a release with `IMAGE_TAG=1.0.0`, and `docker compose pull` to refresh `latest`.
+(The GHCR package may require `docker login ghcr.io` if it isn't public.)
+
+## Build from source (opt-in)
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+# or, equivalently, just build the image:
+./build.sh
+```
+
+This builds `digisante-fhir-test-kit:${LOCAL_TAG:-local}` (HAPI version from
+`HAPI_VERSION`) instead of pulling.
 
 ## Loading Implementation Guides
 
@@ -130,9 +144,10 @@ To run the assertions against an already-running stack:
 ## Repository layout
 
 ```
-build.sh                 # builds the versioned FHIR image
-docker-compose.yml       # db + fhir
+build.sh                 # build the FHIR image locally (:local tag)
+docker-compose.yml       # db + fhir (pulls the published image)
+docker-compose.build.yml # override: build fhir from source instead of pulling
 fhir-server/             # Dockerfile, entrypoint (IG_URLS expansion), application.yaml
 tests/                   # provision.sh, run-tests.sh, multipass.sh
-.github/workflows/ci.yml
+.github/workflows/ci.yml # tests + publish image to GHCR
 ```
