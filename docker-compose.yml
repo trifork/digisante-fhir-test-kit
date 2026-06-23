@@ -1,0 +1,44 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-hapi}
+      POSTGRES_USER: ${POSTGRES_USER:-hapi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hapi}
+    volumes:
+      - hapi-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hapi} -d ${POSTGRES_DB:-hapi}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  fhir:
+    image: ${IMAGE_PREFIX:-digisante-fhir-test-kit}-hapi-${HAPI_VERSION:-v8.4.0-3}:${IMAGE_VERSION:-0.1.0}
+    build:
+      context: ./fhir-server
+      args:
+        HAPI_VERSION: ${HAPI_VERSION:-v8.4.0-3}
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-hapi}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-hapi}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-hapi}
+      # Implementation Guides to load at startup (see .env.example).
+      IG_URLS: ${IG_URLS:-}
+      LOG_PACKAGES: ${LOG_PACKAGES:-INFO}
+    ports:
+      - "${FHIR_PORT:-8080}:8080"
+    # Branding override: the image ships HL7 Switzerland defaults at /branding.
+    # To customise the tester, mount a host directory over /branding containing:
+    #   custom/logo.jpg       (logo shown in the tester banner)
+    #   custom/welcome.html   (welcome / sample text on the home page)
+    #   name.txt              (server name shown in the navbar)
+    # Uncomment and point BRANDING_DIR at your folder:
+    # volumes:
+    #   - ${BRANDING_DIR:-./fhir-server/branding}:/branding:ro
+
+volumes:
+  hapi-pgdata:

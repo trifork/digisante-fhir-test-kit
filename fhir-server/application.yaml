@@ -1,0 +1,81 @@
+logging:
+  level:
+    ca.uhn.fhir.jpa.packages: ${LOG_PACKAGES:INFO}
+
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://db:5432/hapi}
+    username: ${SPRING_DATASOURCE_USERNAME:hapi}
+    password: ${SPRING_DATASOURCE_PASSWORD:hapi}
+    driverClassName: org.postgresql.Driver
+  jpa:
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        # Enable Hibernate Search (Lucene) so the terminology service can expand
+        # ValueSets — including "include all codes of a CodeSystem" sets — which
+        # powers selectable codes in the profile UI's bound fields. Without this
+        # the server returns "Hibernate Search was not initialized" on $expand.
+        search:
+          enabled: true
+          backend:
+            type: lucene
+            analysis:
+              configurer: ca.uhn.fhir.jpa.search.HapiHSearchAnalysisConfigurers$HapiLuceneAnalysisConfigurer
+            directory:
+              type: local-filesystem
+              root: ${HSEARCH_DIR:/tmp/lucenefiles}
+            lucene_version: lucene_current
+
+hapi:
+  fhir:
+    fhir_version: R4
+
+    # Generic hapi.fhir.org-style tester UI (served by this server on :8080).
+    # The displayed name defaults to HL7 Switzerland and can be overridden via the
+    # HAPI_FHIR_TESTER_HOME_NAME env var or a mounted /branding/name.txt (applied
+    # by entrypoint.sh).
+    tester:
+      home:
+        name: ${HAPI_FHIR_TESTER_HOME_NAME:HL7 Switzerland FHIR Test Kit}
+        server_address: ${TESTER_SERVER_ADDRESS:http://localhost:8080/fhir}
+        refuse_to_fetch_third_party_urls: false
+        fhir_version: R4
+
+    # NOTE: automatic request/response validation interceptors are intentionally
+    # left disabled. The $validate operation (used by the custom per-IG UI as the
+    # authoritative validator) is always available regardless. Enabling
+    # responses_enabled validates every search Bundle and can turn ordinary list
+    # responses into HTTP 422s, so we avoid it.
+
+    # Allow references to canonical resources defined by installed IGs.
+    allow_external_references: true
+    enforce_referential_integrity_on_write: false
+
+    # Let the custom UI install/replace packages at runtime if needed.
+    ig_runtime_upload_enabled: true
+
+    # Download and install the full transitive dependency closure of every loaded
+    # IG (the packages declared in each package.json's dependencies, recursively).
+    # This pulls in base IGs such as ch-core / ch-term and the HL7 terminology and
+    # extension packages, so profiles a loaded IG builds on — including profiles
+    # referenced via the structuredefinition-imposeProfile extension, whose target
+    # packages are part of that dependency closure — are present for snapshot
+    # generation and $validate.
+    install_transitive_ig_dependencies: ${HAPI_FHIR_INSTALL_TRANSITIVE_IG_DEPENDENCIES:true}
+
+    # Branding for the built-in tester. The starter serves /content/** from this
+    # path, so the tester picks up custom/logo.jpg and custom/welcome.html, and
+    # the displayed name comes from tester.home.name (above). The image ships
+    # HL7 Switzerland defaults under /branding; mount a host directory at
+    # /branding (or set HAPI_FHIR_CUSTOM_CONTENT_PATH) to override.
+    # Bare directory path (the starter wraps it in a FileUrlResource that adds the
+    # file: protocol itself, so do NOT prefix with file:). The trailing "//" is
+    # deliberate: the starter strips one trailing slash, and the resource location
+    # must keep a trailing slash for /content/** sub-paths to resolve.
+    custom_content_path: ${HAPI_FHIR_CUSTOM_CONTENT_PATH:/branding//}
+
+    # NOTE: implementationguides.* entries are injected at container start by
+    # entrypoint.sh from the IG_URLS parameter. Native
+    # hapi.fhir.implementationguides.<id>.{name,version,packageUrl,installMode}
+    # env vars are also honoured directly.
