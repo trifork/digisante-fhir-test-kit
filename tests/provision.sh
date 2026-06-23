@@ -20,8 +20,10 @@ echo "Provisioning stack with: $COMPOSE"
 echo "  HAPI_VERSION=$HAPI_VERSION  IMAGE_VERSION=$IMAGE_VERSION"
 echo "  IG_URLS=$IG_URLS"
 
+# Build from source (base + build override) so tests exercise the current tree
+# rather than the published image.
 # shellcheck disable=SC2086
-$COMPOSE up -d --build
+$COMPOSE -f docker-compose.yml -f docker-compose.build.yml up -d --build
 
 # Container runtime used for diagnostics / fail-fast — match it to $COMPOSE so we
 # inspect the containers the compose tool actually created.
