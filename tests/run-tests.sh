@@ -56,6 +56,15 @@ imposed=$(printf '%s' "$invalid" | jq_py 'import sys,json; d=json.load(sys.stdin
 { [ -n "$ierrs" ] && [ "$ierrs" -gt 0 ]; } && ok "empty Composition rejected by profile ($ierrs error issue(s))" || no "empty Composition was not rejected"
 { [ -n "$imposed" ] && [ "$imposed" -gt 0 ]; } && ok "imposed IPS profile enforced ($imposed issue(s) from Composition-uv-ips)" || no "imposed IPS profile not enforced"
 
+echo "[4] IG example instances are installed (INSTALL_EXAMPLES)"
+# CH EMR ships example Patients in its package example folder; the server only
+# holds Patient instances if those examples were created, so a non-zero count
+# proves example installation. Look one up by its known example id too.
+patients=$(curl -s "$FHIR_BASE/Patient?_summary=count" | jq_py 'import sys,json; print(json.load(sys.stdin).get("total",0))' 2>/dev/null)
+{ [ -n "$patients" ] && [ "$patients" -gt 0 ]; } && ok "example instances created (Patient count=$patients)" || no "no example instances found (Patient count=${patients:-?})"
+ex=$(curl -s -o /dev/null -w "%{http_code}" "$FHIR_BASE/Patient/UC2-Patient-WalterSchmid")
+[ "$ex" = "200" ] && ok "known example resolvable (Patient/UC2-Patient-WalterSchmid)" || no "known example Patient/UC2-Patient-WalterSchmid not found (HTTP $ex)"
+
 echo
 echo "================================"
 echo "Passed: $pass   Failed: $fail"

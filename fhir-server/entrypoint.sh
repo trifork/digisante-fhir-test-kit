@@ -20,6 +20,16 @@ trim() {
   printf '%s' "$s"
 }
 
+# Whether to also create the IGs' example instances (resources shipped in the
+# package's example folder, e.g. example Patients/Compositions). Default: yes.
+# Disable with INSTALL_EXAMPLES=false. EXAMPLE_FOLDERS (comma-separated) selects
+# which package subfolders hold examples (default "example"). These map to HAPI's
+# per-IG implementationguides.<id>.additionalResourceFolders.
+install_examples=1
+case "${INSTALL_EXAMPLES:-true}" in
+  false | FALSE | False | 0 | no | NO | No | off | OFF) install_examples=0 ;;
+esac
+
 if [ -n "${IG_URLS:-}" ]; then
   i=0
   OLD_IFS=$IFS
@@ -69,7 +79,21 @@ if [ -n "${IG_URLS:-}" ]; then
       [ -n "$ex" ] && { export "HAPI_FHIR_IMPLEMENTATIONGUIDES_IG${i}_DEPENDENCYEXCLUDES_${k}=${ex}"; k=$((k + 1)); }
     done
 
-    echo "[entrypoint] IG ${i}: name=${name} version=${version} url=${url} (fetchDependencies=true, excludes=${IG_DEPENDENCY_EXCLUDES-hl7.terminology.r4,hl7.fhir.uv.xver-r5.r4})"
+    # Install example instances from the package's example folder(s).
+    if [ "$install_examples" = 1 ]; then
+      folders=${EXAMPLE_FOLDERS:-example}
+      k=0
+      while [ -n "$folders" ]; do
+        case "$folders" in
+          *,*) folder=${folders%%,*}; folders=${folders#*,} ;;
+          *)   folder=$folders; folders= ;;
+        esac
+        folder=$(trim "$folder")
+        [ -n "$folder" ] && { export "HAPI_FHIR_IMPLEMENTATIONGUIDES_IG${i}_ADDITIONALRESOURCEFOLDERS_${k}=${folder}"; k=$((k + 1)); }
+      done
+    fi
+
+    echo "[entrypoint] IG ${i}: name=${name} version=${version} url=${url} (fetchDependencies=true, examples=${install_examples}, excludes=${IG_DEPENDENCY_EXCLUDES-hl7.terminology.r4,hl7.fhir.uv.xver-r5.r4})"
     i=$((i + 1))
     IFS=','
   done

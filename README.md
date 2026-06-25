@@ -88,6 +88,15 @@ terminology/cross-version helpers, not profiles). Adjust with
 `IG_DEPENDENCY_EXCLUDES` (comma-separated regexes on package id; set empty to attempt
 everything).
 
+### Examples
+
+By default the IGs' **example instances** (the resources in each package's example
+folder — e.g. CH EMR's example Patients, Compositions and Medications) are also
+created on the server, so there is sample data to browse and validate immediately.
+Set `INSTALL_EXAMPLES=false` to install only conformance resources, or
+`EXAMPLE_FOLDERS` (comma-separated, default `example`) to point at other package
+subfolders. This maps to HAPI's per-IG `implementationguides.<id>.additionalResourceFolders`.
+
 ## Branding the built-in tester
 
 The tester's **logo, name and welcome/sample text** default to HL7 Switzerland and
